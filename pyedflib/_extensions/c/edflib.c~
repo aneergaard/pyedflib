@@ -2030,30 +2030,26 @@ static struct edfhdrblock * edflib_check_edf_file(FILE *inputfile, int *edf_erro
   {
     strncpy(scratchpad, edf_hdr + 256 + (edfhdr->edfsignals * 128) + (i * 8), 8);
     scratchpad[8] = 0;
-    
+
     for(j=0; j<8; j++)
     {
       if((scratchpad[j]<32)||(scratchpad[j]>126))
       {
-        /*
         *edf_error = EDFLIB_FILE_ERRORS_DIG_MAX;
         free(edf_hdr);
         free(edfhdr->edfparam);
         free(edfhdr);
         return(NULL);
-        */
       }
     }
 
     if(edflib_is_integer_number(scratchpad))
     {
-      /*
       *edf_error = EDFLIB_FILE_ERRORS_DIG_MAX;
       free(edf_hdr);
       free(edfhdr->edfparam);
       free(edfhdr);
       return(NULL);
-      */
     }
 
     n = edflib_atof_nonlocalized(scratchpad);
@@ -2063,13 +2059,11 @@ static struct edfhdrblock * edflib_check_edf_file(FILE *inputfile, int *edf_erro
       {
         if(n!=32767)
         {
-          /*
           *edf_error = EDFLIB_FILE_ERRORS_DIG_MAX;
           free(edf_hdr);
           free(edfhdr->edfparam);
           free(edfhdr);
           return(NULL);
-          */
         }
       }
     }
@@ -2079,13 +2073,11 @@ static struct edfhdrblock * edflib_check_edf_file(FILE *inputfile, int *edf_erro
       {
         if(n!=8388607)
         {
-          /*
           *edf_error = EDFLIB_FILE_ERRORS_DIG_MAX;
           free(edf_hdr);
           free(edfhdr->edfparam);
           free(edfhdr);
           return(NULL);
-          */
         }
       }
     }
@@ -2093,38 +2085,32 @@ static struct edfhdrblock * edflib_check_edf_file(FILE *inputfile, int *edf_erro
     {
       if((n>32767)||(n<-32768))
       {
-        /*
         *edf_error = EDFLIB_FILE_ERRORS_DIG_MAX;
         free(edf_hdr);
         free(edfhdr->edfparam);
         free(edfhdr);
         return(NULL);
-        */
       }
     }
     else
     {
       if((n>8388607)||(n<-8388608))
       {
-        /*
         *edf_error = EDFLIB_FILE_ERRORS_DIG_MAX;
         free(edf_hdr);
         free(edfhdr->edfparam);
         free(edfhdr);
         return(NULL);
-        */
       }
     }
     edfhdr->edfparam[i].dig_max = n;
     if(edfhdr->edfparam[i].dig_max<(edfhdr->edfparam[i].dig_min + 1) && (edfhdr->bdfplus || edfhdr->edfplus))
     {
-      /*
       *edf_error = EDFLIB_FILE_ERRORS_DIG_MAX;
       free(edf_hdr);
       free(edfhdr->edfparam);
       free(edfhdr);
       return(NULL);
-      */
     }
   }
 
