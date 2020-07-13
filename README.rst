@@ -10,7 +10,7 @@ pyEDFlib
     :target: https://travis-ci.org/holgern/pyedflib
     
 .. image:: https://ci.appveyor.com/api/projects/status/49wwigslgtj288q1?svg=true
-  :target: https://ci.appveyor.com/project/HolgerNahrstaedt/pyedflib
+  :target: https://ci.appveyor.com/project/holger80/pyedflib
   
 .. image:: https://readthedocs.org/projects/pyedflib/badge/?version=latest
   :target: http://pyedflib.readthedocs.org/en/latest/?badge=latest
@@ -51,14 +51,14 @@ Documentation is available online at http://pyedflib.readthedocs.org.
 Installation
 ------------
 
-pyEDFlib can be used with `Python`_ 2.7.x or >=3.4. It depends on the `Numpy`_ package.
+pyEDFlib can be used with `Python`_ >=3.5. It depends on the `Numpy`_ package.
 To use the newest source code from git, you have to download the source code.
 You need a C compiler and a recent version of `Cython`_. Go then to the source directory and type::
 
     python setup.py build
     python setup.py install
 
-There are binary wheels which can be installed by::
+There are binary wheels which can be installed by (use pip3 when available)::
 
     pip install pyEDFlib
 
@@ -76,12 +76,47 @@ The latest release, including source and binary packages for Linux,
 macOS and Windows, is available for download from the `Python Package Index`_.
 You can find source releases at the `Releases Page`_.
 
+
+Highlevel interface
+-------------------
+
+pyEDFlib includes an highlevel interface for easy access to read and write edf files.
+Additionally functionality as anonymizing, dropping or renaming channels can be found there.
+
+.. code-block:: Python
+
+    from pyedflib import highlevel
+
+    # write an edf file
+    signals = np.random.rand(5, 256*300)*200 # 5 minutes of random signal
+    channel_names = ['ch1', 'ch2', 'ch3', 'ch4', 'ch5']
+    signal_headers = highlevel.make_signal_headers(channel_names, sample_rate=256)
+    header = highlevel.make_header(patientname='patient_x', gender='Female')
+    highlevel.write_edf('edf_file.edf', signals, signal_headers, header)
+	    
+    # read an edf file
+    signals, signal_headers, header = highlevel.read_edf('edf_file.edf')
+    print(signal_headers[0]['sample_rate']) # prints 256
+
+    # drop a channel from the file or anonymize edf
+    highlevel.drop_channels('edf_file.edf', to_drop=['ch2', 'ch4'])
+    highlevel.anonymize_edf('edf_file.edf', new_file='anonymized.edf'
+	                         to_remove=['patientname', 'birthdate'],
+	                         new_values=['anonymized', ''])
+	# check if the two files have the same content
+	highlevel.compare_edf('edf_file.edf', 'anonymized.edf')
+
+
 License
 -------
 
 pyEDFlib is a free Open Source software released under the BSD 2-clause license.
 
   
+Releases can be cited via Zenodo.
+
+.. image:: https://zenodo.org/badge/42585968.svg
+   :target: https://zenodo.org/badge/latestdoi/42585968
   
 .. _Cython: http://cython.org/
 .. _Anaconda: https://www.continuum.io

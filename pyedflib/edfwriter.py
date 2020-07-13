@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2015 - 2017 Holger Nahrstaedt
+# Copyright (c) 2019 - 2020 Simon Kern
+# Copyright (c) 2015 - 2020 Holger Nahrstaedt
 # Copyright (c) 2011, 2015, Chris Lee-Messer
 # Copyright (c) 2016-2017 The pyedflib Developers
 #                         <https://github.com/holgern/pyedflib>
 # See LICENSE for license details.
-from __future__ import division, print_function, absolute_import
 
 import numpy as np
 import sys
@@ -13,7 +13,7 @@ from ._extensions._pyedflib import FILETYPE_EDFPLUS, FILETYPE_BDFPLUS, FILETYPE_
 from ._extensions._pyedflib import open_file_writeonly, set_physical_maximum, set_patient_additional, set_digital_maximum
 from ._extensions._pyedflib import set_birthdate, set_digital_minimum, set_technician, set_recording_additional, set_patientname
 from ._extensions._pyedflib import set_patientcode, set_equipment, set_admincode, set_gender, set_datarecord_duration, set_number_of_annotation_signals
-from ._extensions._pyedflib import set_startdatetime, set_samplefrequency, set_physical_minimum, set_label, set_physical_dimension
+from ._extensions._pyedflib import set_startdatetime, set_starttime_subsecond, set_samplefrequency, set_physical_minimum, set_label, set_physical_dimension
 from ._extensions._pyedflib import set_transducer, set_prefilter, write_physical_samples, close_file, write_annotation_latin1, write_annotation_utf8
 from ._extensions._pyedflib import blockwrite_physical_samples, write_errors, blockwrite_digital_samples, write_digital_short_samples, write_digital_samples, blockwrite_digital_short_samples
 
@@ -21,26 +21,15 @@ from ._extensions._pyedflib import blockwrite_physical_samples, write_errors, bl
 __all__ = ['EdfWriter']
 
 
-if sys.version_info < (3,):
-    import codecs
+def u(x):
+    return x.decode("utf-8", "strict")
 
-    def u(x):
-        return codecs.unicode_escape_decode(x)[0]
 
-    def du(x):
-        if isinstance(x, unicode):
-            return x.encode("utf-8")
-        else:
-            return x
-else:
-    def u(x):
-        return x.decode("utf-8", "strict")
-
-    def du(x):
-        if isbytestr(x):
-            return x
-        else:
-            return x.encode("utf-8")
+def du(x):
+    if isbytestr(x):
+        return x
+    else:
+        return x.encode("utf-8")
 
 
 def isstr(s):
@@ -52,6 +41,17 @@ def isstr(s):
 
 def isbytestr(s):
     return isinstance(s, bytes)
+
+
+def gender2int(gender):
+    if isinstance(gender, int):
+        return gender
+    if gender in ["Female", "FEMALE", "female", "f", "F"]:
+        return 0
+    elif gender in ["Male", "MALE", "male", "m", "M"]:
+        return 1
+    else:
+        return 0
 
 
 class ChannelDoesNotExist(Exception):
@@ -72,10 +72,11 @@ class WrongInputSize(Exception):
 
 class EdfWriter(object):
     def __exit__(self, exc_type, exc_val, ex_tb):
-        self.close()  # cleanup the file
+        self.close()
 
     def __enter__(self):
         return self
+        # return self
 
     def __del__(self):
         self.close()
@@ -110,7 +111,8 @@ class EdfWriter(object):
         self.patient_additional = ''
         self.admincode = ''
         self.gender = None
-        self.recording_start_time = datetime.now()
+        self.recording_start_time = datetime.now().replace(microsecond=0)
+
         self.birthdate = ''
         self.duration = 1
         self.number_of_annotations = 1 if file_type in [FILETYPE_EDFPLUS, FILETYPE_BDFPLUS] else 0
@@ -147,16 +149,17 @@ class EdfWriter(object):
         set_admincode(self.handle, du(self.admincode))
         if isinstance(self.gender, int):
             set_gender(self.handle, self.gender)
-        elif self.gender == "Male":
-            set_gender(self.handle, 0)
-        elif self.gender == "Female":
-            set_gender(self.handle, 1)
+        else:
+            set_gender(self.handle, gender2int(self.gender))
 
         set_datarecord_duration(self.handle, self.duration)
         set_number_of_annotation_signals(self.handle, self.number_of_annotations)
         set_startdatetime(self.handle, self.recording_start_time.year, self.recording_start_time.month,
                           self.recording_start_time.day, self.recording_start_time.hour,
                           self.recording_start_time.minute, self.recording_start_time.second)
+        # subseconds are noted in nanoseconds, so we multiply by 100
+        if self.recording_start_time.microsecond>0:
+            set_starttime_subsecond(self.handle, self.recording_start_time.microsecond*100)
         if isstr(self.birthdate):
             if self.birthdate != '':
                 birthday = datetime.strptime(self.birthdate, '%d %b %Y').date()
@@ -331,7 +334,11 @@ class EdfWriter(object):
         gender : int
             1 is male, 0 is female
         """
-        self.gender = gender
+        if isinstance(gender, int):
+            self.gender = gender
+        else:
+            self.gender = gender2int(gender)
+
         self.update_header()
 
     def setDatarecordDuration(self, duration):
@@ -389,10 +396,9 @@ class EdfWriter(object):
         recording_start_time: datetime object
             Sets the recording start Time
         """
-        if isinstance(recording_start_time,datetime):
-            self.recording_start_time = recording_start_time
-        else:
+        if not isinstance(recording_start_time, datetime):
             self.recording_start_time = datetime.strptime(recording_start_time,"%d %b %Y %H:%M:%S")
+        self.recording_start_time = recording_start_time
         self.update_header()
 
     def setBirthdate(self, birthdate):
@@ -473,7 +479,7 @@ class EdfWriter(object):
 
     def setDigitalMaximum(self, edfsignal, digital_maximum):
         """
-        Sets the samplefrequency of signal edfsignal.
+        Sets the maximum digital value of signal edfsignal.
         Usually, the value 32767 is used for EDF+ and 8388607 for BDF+.
 
         Parameters
@@ -636,7 +642,7 @@ class EdfWriter(object):
     def blockWriteDigitalShortSamples(self, data):
         return blockwrite_digital_short_samples(self.handle, data)
 
-    def writeSamples(self, data_list):
+    def writeSamples(self, data_list, digital = False):
         """
         Writes physical samples (uV, mA, Ohm) from data belonging to all signals
         The physical samples will be converted to digital samples using the values
@@ -646,12 +652,21 @@ class EdfWriter(object):
         is different, then sample_freq is a vector containing all the different
         samplefrequencys. The data is saved as list. Each list entry contains
         a vector with the data of one signal.
+        
+        If digital is True, digital signals (as directly from the ADC) will be expected.
+        (e.g. int16 from 0 to 2048)
 
         All parameters must be already written into the bdf/edf-file.
         """
 
+
         if (len(data_list) != len(self.channels)):
             raise WrongInputSize(len(data_list))
+            
+        if digital:
+            if any([not np.issubdtype(a.dtype, np.integer) for a in data_list]):
+                raise TypeError('Digital = True requires all signals in int')
+
 
         ind = []
         notAtEnd = True
@@ -659,46 +674,62 @@ class EdfWriter(object):
             ind.append(0)
 
         sampleLength = 0
-        sampleRates = np.zeros(len(data_list), dtype=int)
+        sampleRates = np.zeros(len(data_list), dtype=np.int32)
         for i in np.arange(len(data_list)):
             sampleRates[i] = self.channels[i]['sample_rate']
             if (np.size(data_list[i]) < ind[i] + self.channels[i]['sample_rate']):
                 notAtEnd = False
             sampleLength += self.channels[i]['sample_rate']
 
-        dataOfOneSecond = np.array([])
+        dataOfOneSecond = np.array([], dtype=np.int32 if digital else None)
 
         while notAtEnd:
             # dataOfOneSecondInd = 0
             del dataOfOneSecond
-            dataOfOneSecond = np.array([])
+            dataOfOneSecond = np.array([], dtype=np.int32 if digital else None)
             for i in np.arange(len(data_list)):
                 # dataOfOneSecond[dataOfOneSecondInd:dataOfOneSecondInd+self.channels[i]['sample_rate']] = data_list[i].ravel()[int(ind[i]):int(ind[i]+self.channels[i]['sample_rate'])]
                 dataOfOneSecond = np.append(dataOfOneSecond,data_list[i].ravel()[int(ind[i]):int(ind[i]+sampleRates[i])])
                 # self.writePhysicalSamples(data_list[i].ravel()[int(ind[i]):int(ind[i]+self.channels[i]['sample_rate'])])
                 ind[i] += sampleRates[i]
                 # dataOfOneSecondInd += sampleRates[i]
-            self.blockWritePhysicalSamples(dataOfOneSecond)
+            if digital:
+                success = self.blockWriteDigitalSamples(dataOfOneSecond)
+            else:
+                success = self.blockWritePhysicalSamples(dataOfOneSecond)
+
+            if success<0:
+                raise IOError('Unknown error while calling blockWriteSamples')
+
             for i in np.arange(len(data_list)):
                 if (np.size(data_list[i]) < ind[i] + sampleRates[i]):
                     notAtEnd = False
 
+
         # dataOfOneSecondInd = 0
         for i in np.arange(len(data_list)):
-            lastSamples = np.zeros(sampleRates[i])
+            lastSamples = np.zeros(sampleRates[i], dtype=np.int32 if digital else None)
             lastSampleInd = int(np.max(data_list[i].shape) - ind[i])
             lastSampleInd = int(np.min((lastSampleInd,sampleRates[i])))
             if lastSampleInd > 0:
                 lastSamples[:lastSampleInd] = data_list[i].ravel()[-lastSampleInd:]
                 # dataOfOneSecond[dataOfOneSecondInd:dataOfOneSecondInd+self.channels[i]['sample_rate']] = lastSamples
                 # dataOfOneSecondInd += self.channels[i]['sample_rate']
-                self.writePhysicalSamples(lastSamples)
+                if digital:
+                    success = self.writeDigitalSamples(lastSamples)
+                else:
+                    success = self.writePhysicalSamples(lastSamples)
+
+                if success<0:
+                    raise IOError('Unknown error while calling writeSamples')
         # self.blockWritePhysicalSamples(dataOfOneSecond)
 
     def writeAnnotation(self, onset_in_seconds, duration_in_seconds, description, str_format='utf-8'):
         """
         Writes an annotation/event to the file
         """
+        if self.file_type in [FILETYPE_EDF, FILETYPE_BDF]:
+            raise TypeError('Trying to write annotation to EDF/BDF, must use EDF+/BDF+')
         if str_format == 'utf-8':
             if duration_in_seconds >= 0:
                 return write_annotation_utf8(self.handle, np.round(onset_in_seconds*10000).astype(int), np.round(duration_in_seconds*10000).astype(int), du(description))

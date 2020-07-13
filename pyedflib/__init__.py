@@ -1,6 +1,7 @@
 # flake8: noqa
 
-# Copyright (c) 2015 - 2017 Holger Nahrstaedt
+# Copyright (c) 2019 - 2020 Simon Kern
+# Copyright (c) 2015 - 2020 Holger Nahrstaedt
 # Copyright (c) 2016-2017 The pyedflib Developers
 #                         <https://github.com/holgern/pyedflib>
 # See LICENSE for license details.
@@ -10,6 +11,7 @@ from __future__ import division, print_function, absolute_import
 from ._extensions._pyedflib import *
 from .edfwriter import *
 from .edfreader import *
+from . import highlevel
 
 from . import data
 

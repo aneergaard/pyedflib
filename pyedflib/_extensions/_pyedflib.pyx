@@ -4,7 +4,7 @@
 # See LICENSE for license details.
 
 __doc__ = """Cython wrapper for low-level C edflib implementation."""
-__all__ = ['lib_version', 'CyEdfReader', 'set_patientcode', 
+__all__ = ['lib_version', 'CyEdfReader', 'set_patientcode', 'set_starttime_subsecond',
            'write_annotation_latin1', 'write_annotation_utf8', 'set_technician', 'EdfAnnotation',
            'get_annotation', 'read_int_samples', 'blockwrite_digital_samples', 'blockwrite_physical_samples',
            'set_recording_additional', 'write_physical_samples' ,'set_patientname', 'set_physical_minimum', 
@@ -135,7 +135,7 @@ cdef class CyEdfReader:
         -  might extend to provide for N datarecord size
 
         """
-        print "self.hdr.datarecords_in_file", self.hdr.datarecords_in_file
+        print ("self.hdr.datarecords_in_file", self.hdr.datarecords_in_file)
         tmp =0
         for ii in range(self.signals_in_file):
             tmp += self.samples_in_datarecord(ii)
@@ -147,7 +147,7 @@ cdef class CyEdfReader:
         """
         open(file_name, annotations_mode, check_file_size)
         """
-        file_name_str = file_name.encode('raw_unicode_escape','strict')
+        file_name_str = file_name.encode('utf8','strict')
         result = c_edf.edfopen_file_readonly(file_name_str, &self.hdr, annotations_mode, check_file_size)
         
         self.file_name = file_name
@@ -176,8 +176,6 @@ cdef class CyEdfReader:
         "number of data records"
         def __get__(self):
             return self.hdr.datarecords_in_file
-            
-
 
     property signals_in_file:
         def __get__(self):
@@ -187,6 +185,10 @@ cdef class CyEdfReader:
         "file duration in seconds"
         def __get__(self):
             return self.hdr.file_duration/EDFLIB_TIME_DIMENSION
+
+    property filetype:
+        def __get__(self):
+            return self.hdr.filetype
 
     property patient:
         "patient name?"
@@ -245,6 +247,10 @@ cdef class CyEdfReader:
     property starttime_second:
         def __get__(self):
             return self.hdr.starttime_second
+
+    property starttime_subsecond:
+        def __get__(self):
+            return self.hdr.starttime_subsecond
 
     property admincode:
         def __get__(self):
@@ -335,7 +341,7 @@ cdef class CyEdfReader:
         readn = c_edf.edfread_physical_samples(self.hdr.handle, signalnum, n, <double*>sigbuf.data)
         # print "read %d samples" % readn
         if readn != n:
-            print "read %d, less than %d requested!!!" % (readn, n)
+            print ("read %d, less than %d requested!!!" % (readn, n))
         
     def load_datarecord(self, np.ndarray[np.float64_t, ndim=1] db, n=0):
         cdef size_t offset =0
@@ -345,7 +351,7 @@ cdef class CyEdfReader:
                 c_edf.edfseek(self.hdr.handle, ii, n*self.samples_in_datarecord(ii), EDFSEEK_SET) # just a guess
                 readn = c_edf.edfread_physical_samples(self.hdr.handle, ii, self.samples_in_datarecord(ii),
                                                  (<double*>db.data)+offset)
-                print "readn this many samples", readn
+                print ("readn this many samples", readn)
                 offset += self.samples_in_datarecord(ii)
 
 
@@ -455,7 +461,7 @@ def get_handle(file_number):
     return c_edf.edflib_get_handle(file_number)
 
 def is_file_used(path):
-    path_str = _ustring(path).encode('raw_unicode_escape','strict')
+    path_str = _ustring(path).encode('utf8','strict')
     return c_edf.edflib_is_file_used(path_str)
 
 # so you can use the same name if defining a python only function
@@ -464,7 +470,7 @@ def set_physical_maximum(handle, edfsignal, phys_max):
 
 def open_file_writeonly(path, filetype, number_of_signals):
     """int edfopen_file_writeonly(char *path, int filetype, int number_of_signals)"""
-    py_byte_string  = _ustring(path).encode('raw_unicode_escape','strict')
+    py_byte_string  = _ustring(path).encode('utf8','strict')
     cdef char* path_str = py_byte_string
     return c_edf.edfopen_file_writeonly(path_str, filetype, number_of_signals)
     
@@ -543,6 +549,10 @@ def set_startdatetime(handle, startdate_year, startdate_month, startdate_day,
                                       int starttime_hour, int starttime_minute, int starttime_second)"""
     return c_edf.edf_set_startdatetime(handle, startdate_year, startdate_month, startdate_day,
                                  starttime_hour, starttime_minute, starttime_second)
+
+def set_starttime_subsecond(handle, subsecond):
+    """int edf_set_subsecond_starttime(int handle, int subsecond)"""
+    return c_edf.edf_set_subsecond_starttime(handle, subsecond)
 
 def set_datarecord_duration(handle, duration):
     """int edf_set_datarecord_duration(int handle, int duration)"""
