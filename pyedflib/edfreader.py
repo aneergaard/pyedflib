@@ -98,7 +98,7 @@ class EdfReader(CyEdfReader):
         return {"technician": self.getTechnician(), "recording_additional": self.getRecordingAdditional(),
                 "patientname": self.getPatientName(), "patient_additional": self.getPatientAdditional(),
                 "patientcode": self.getPatientCode(), "equipment": self.getEquipment(),
-                "admincode": self.getAdmincode(), "gender": self.getGender(), "startdate": self.getStartdatetime(),
+                "admincode": self.getAdmincode(), "gender": self.getGender(), "startdate": None,
                 "birthdate": self.getBirthdate()}
 
     def getSignalHeader(self, chn):
@@ -322,6 +322,11 @@ class EdfReader(CyEdfReader):
         """
         # denoted as long long in nanoseconds, we need to transfer it to microsecond
         subsecond = self.starttime_subsecond//100
+
+        # HACK
+        if self.starttime_second > 59:
+            self.starttime_second = 59
+        print(self.starttime_second)
         return datetime(self.startdate_year, self.startdate_month, self.startdate_day,
                                  self.starttime_hour, self.starttime_minute, self.starttime_second,
                                  subsecond)

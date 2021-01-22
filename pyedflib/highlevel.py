@@ -357,7 +357,7 @@ def read_edf(edf_file, ch_nrs=None, ch_names=None, digital=False, verbose=True):
         header['annotations'] = annotations
         signals = []
         for i,c in enumerate(tqdm(ch_nrs, desc='Reading Channels',
-                                  disable=not verbose)):
+                                  disable=not verbose, leave=False)):
             signal = f.readSignal(c, digital=digital)
             signals.append(signal)
 
@@ -429,7 +429,7 @@ def write_edf(edf_file, signals, signal_headers, header=None, digital=False,
     default_header = make_header()
     default_header.update(header)
     header = default_header
-    
+
     annotations = header.get('annotations', [])
 
 
