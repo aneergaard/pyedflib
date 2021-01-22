@@ -44,14 +44,16 @@ def isbytestr(s):
 
 
 def gender2int(gender):
-    if isinstance(gender, int):
+    if isinstance(gender, int) or gender is None:
         return gender
-    if gender in ["Female", "FEMALE", "female", "f", "F"]:
+    elif gender.lower() in ['', 'x', 'xx', 'xxx', 'unknown', '?', '??']:
+        return None
+    elif gender.lower() in ["female", "woman", "f", "w"]:
         return 0
-    elif gender in ["Male", "MALE", "male", "m", "M"]:
+    elif gender.lower() in  ["male", "man", "m"]:
         return 1
     else:
-        return 0
+        raise ValueError("Unknown gender: '{}'".format(gender))
 
 
 class ChannelDoesNotExist(Exception):
@@ -147,10 +149,7 @@ class EdfWriter(object):
         set_patient_additional(self.handle, du(self.patient_additional))
         set_equipment(self.handle, du(self.equipment))
         set_admincode(self.handle, du(self.admincode))
-        if isinstance(self.gender, int):
-            set_gender(self.handle, self.gender)
-        else:
-            set_gender(self.handle, gender2int(self.gender))
+        set_gender(self.handle, gender2int(self.gender))
 
         set_datarecord_duration(self.handle, self.duration)
         set_number_of_annotation_signals(self.handle, self.number_of_annotations)
@@ -334,11 +333,7 @@ class EdfWriter(object):
         gender : int
             1 is male, 0 is female
         """
-        if isinstance(gender, int):
-            self.gender = gender
-        else:
-            self.gender = gender2int(gender)
-
+        self.gender = gender2int(gender)
         self.update_header()
 
     def setDatarecordDuration(self, duration):
@@ -397,7 +392,7 @@ class EdfWriter(object):
             Sets the recording start Time
         """
         if not isinstance(recording_start_time, datetime):
-            self.recording_start_time = datetime.strptime(recording_start_time,"%d %b %Y %H:%M:%S")
+            recording_start_time = datetime.strptime(recording_start_time,"%d %b %Y %H:%M:%S")
         self.recording_start_time = recording_start_time
         self.update_header()
 
@@ -421,6 +416,8 @@ class EdfWriter(object):
         -----
         This function is optional and can be called only after opening a file in writemode and before the first sample write action.
         """
+        if isinstance(birthdate, str):
+            birthdate = datetime.strptime(birthdate, "%d.%m.%Y")
         self.birthdate = birthdate
         self.update_header()
 
@@ -667,6 +664,11 @@ class EdfWriter(object):
             if any([not np.issubdtype(a.dtype, np.integer) for a in data_list]):
                 raise TypeError('Digital = True requires all signals in int')
 
+        # Check that all channels have different physical_minimum and physical_maximum
+        for chan in self.channels:
+            assert chan['physical_min'] != chan['physical_max'], \
+            'In chan {} physical_min {} should be different from '\
+            'physical_max {}'.format(chan['label'], chan['physical_min'], chan['physical_max'])
 
         ind = []
         notAtEnd = True

@@ -11,9 +11,15 @@ import numpy as np
 
 from ._extensions._pyedflib import CyEdfReader
 
-__all__ = ['EdfReader', 'DO_NOT_READ_ANNOTATIONS',
-           'READ_ANNOTATIONS', 'READ_ALL_ANNOTATIONS', 'CHECK_FILE_SIZE',
-           'DO_NOT_CHECK_FILE_SIZE', 'REPAIR_FILE_SIZE_IF_WRONG']
+__all__ = [
+    "EdfReader",
+    "DO_NOT_READ_ANNOTATIONS",
+    "READ_ANNOTATIONS",
+    "READ_ALL_ANNOTATIONS",
+    "CHECK_FILE_SIZE",
+    "DO_NOT_CHECK_FILE_SIZE",
+    "REPAIR_FILE_SIZE_IF_WRONG",
+]
 
 DO_NOT_READ_ANNOTATIONS = 0
 READ_ANNOTATIONS = 1
@@ -28,6 +34,7 @@ class EdfReader(CyEdfReader):
     """
     This provides a simple interface to read EDF, EDF+, BDF and BDF+ files.
     """
+
     def __enter__(self):
         return self
 
@@ -44,8 +51,7 @@ class EdfReader(CyEdfReader):
         self._close()
 
     def getNSamples(self):
-        return np.array([self.samples_in_file(chn)
-                         for chn in np.arange(self.signals_in_file)])
+        return np.array([self.samples_in_file(chn) for chn in np.arange(self.signals_in_file)])
 
     def readAnnotations(self):
         """
@@ -57,17 +63,17 @@ class EdfReader(CyEdfReader):
         """
         annot = self.read_annotation()
         annot = np.array(annot)
-        if (annot.shape[0] == 0):
+        if annot.shape[0] == 0:
             return np.array([]), np.array([]), np.array([])
         ann_time = self._get_float(annot[:, 0])
         ann_text = annot[:, 2]
         ann_text_out = ["" for x in range(len(annot[:, 1]))]
         for i in np.arange(len(annot[:, 1])):
             ann_text_out[i] = self._convert_string(ann_text[i])
-            if annot[i, 1] == '':
-                annot[i, 1] = '-1'
+            if annot[i, 1] == "":
+                annot[i, 1] = "-1"
         ann_duration = self._get_float(annot[:, 1])
-        return ann_time/10000000, ann_duration, np.array(ann_text_out)
+        return ann_time / 10000000, ann_duration, np.array(ann_text_out)
 
     def _get_float(self, v):
         result = np.zeros(np.size(v))
@@ -81,7 +87,7 @@ class EdfReader(CyEdfReader):
                 result[i] = float(v[i])
         return result
 
-    def _convert_string(self,s):
+    def _convert_string(self, s):
         if isinstance(s, bytes):
             return s.decode("latin")
         else:
@@ -95,11 +101,18 @@ class EdfReader(CyEdfReader):
         ----------
         None
         """
-        return {"technician": self.getTechnician(), "recording_additional": self.getRecordingAdditional(),
-                "patientname": self.getPatientName(), "patient_additional": self.getPatientAdditional(),
-                "patientcode": self.getPatientCode(), "equipment": self.getEquipment(),
-                "admincode": self.getAdmincode(), "gender": self.getGender(), "startdate": None,
-                "birthdate": self.getBirthdate()}
+        return {
+            "technician": self.getTechnician(),
+            "recording_additional": self.getRecordingAdditional(),
+            "patientname": self.getPatientName(),
+            "patient_additional": self.getPatientAdditional(),
+            "patientcode": self.getPatientCode(),
+            "equipment": self.getEquipment(),
+            "admincode": self.getAdmincode(),
+            "gender": self.getGender(),
+            "startdate": None,
+            "birthdate": self.getBirthdate(),
+        }
 
     def getSignalHeader(self, chn):
         """
@@ -109,15 +122,17 @@ class EdfReader(CyEdfReader):
         ----------
         None
         """
-        return {'label': self.getLabel(chn),
-                'dimension': self.getPhysicalDimension(chn),
-                                 'sample_rate': self.getSampleFrequency(chn),
-                'physical_max':self.getPhysicalMaximum(chn),
-                'physical_min': self.getPhysicalMinimum(chn),
-                'digital_max': self.getDigitalMaximum(chn),
-                'digital_min': self.getDigitalMinimum(chn),
-                'prefilter':self.getPrefilter(chn),
-                'transducer': self.getTransducer(chn)}
+        return {
+            "label": self.getLabel(chn),
+            "dimension": self.getPhysicalDimension(chn),
+            "sample_rate": self.getSampleFrequency(chn),
+            "physical_max": self.getPhysicalMaximum(chn),
+            "physical_min": self.getPhysicalMinimum(chn),
+            "digital_max": self.getDigitalMaximum(chn),
+            "digital_min": self.getDigitalMinimum(chn),
+            "prefilter": self.getPrefilter(chn),
+            "transducer": self.getTransducer(chn),
+        }
 
     def getSignalHeaders(self):
         """
@@ -321,15 +336,16 @@ class EdfReader(CyEdfReader):
 
         """
         # denoted as long long in nanoseconds, we need to transfer it to microsecond
-        subsecond = self.starttime_subsecond//100
-
-        # HACK
-        if self.starttime_second > 59:
-            self.starttime_second = 59
-        print(self.starttime_second)
-        return datetime(self.startdate_year, self.startdate_month, self.startdate_day,
-                                 self.starttime_hour, self.starttime_minute, self.starttime_second,
-                                 subsecond)
+        subsecond = np.round(self.starttime_subsecond / 100).astype(int)
+        return datetime(
+            self.startdate_year,
+            self.startdate_month,
+            self.startdate_day,
+            self.starttime_hour,
+            self.starttime_minute,
+            self.starttime_second,
+            subsecond,
+        )
 
     def getBirthdate(self, string=True):
         """
@@ -371,10 +387,9 @@ class EdfReader(CyEdfReader):
         >>> f.close()
 
         """
-        return np.array([round(self.samplefrequency(chn))
-                         for chn in np.arange(self.signals_in_file)])
+        return np.array([round(self.samplefrequency(chn)) for chn in np.arange(self.signals_in_file)])
 
-    def getSampleFrequency(self,chn):
+    def getSampleFrequency(self, chn):
         """
         Returns the samplefrequency of signal edfsignal.
 
@@ -414,10 +429,9 @@ class EdfReader(CyEdfReader):
         >>> f.close()
 
         """
-        return [self._convert_string(self.signal_label(chn).strip())
-                for chn in np.arange(self.signals_in_file)]
+        return [self._convert_string(self.signal_label(chn).strip()) for chn in np.arange(self.signals_in_file)]
 
-    def getLabel(self,chn):
+    def getLabel(self, chn):
         """
         Returns the label (name) of signal chn ("FP1", "SaO2", etc.).
 
@@ -438,9 +452,9 @@ class EdfReader(CyEdfReader):
         if 0 <= chn < self.signals_in_file:
             return self._convert_string(self.signal_label(chn).rstrip())
         else:
-            return self._convert_string('')
+            return self._convert_string("")
 
-    def getPrefilter(self,chn):
+    def getPrefilter(self, chn):
         """
         Returns the prefilter of signal chn ("HP:0.1Hz", "LP:75Hz N:50Hz", etc.)
 
@@ -461,9 +475,9 @@ class EdfReader(CyEdfReader):
         if 0 <= chn < self.signals_in_file:
             return self._convert_string(self.prefilter(chn).rstrip())
         else:
-            return self._convert_string('')
+            return self._convert_string("")
 
-    def getPhysicalMaximum(self,chn=None):
+    def getPhysicalMaximum(self, chn=None):
         """
         Returns the maximum physical value of signal edfsignal.
 
@@ -492,7 +506,7 @@ class EdfReader(CyEdfReader):
                 physMax[i] = self.physical_max(i)
             return physMax
 
-    def getPhysicalMinimum(self,chn=None):
+    def getPhysicalMinimum(self, chn=None):
         """
         Returns the minimum physical value of signal edfsignal.
 
@@ -600,7 +614,7 @@ class EdfReader(CyEdfReader):
         if 0 <= chn < self.signals_in_file:
             return self._convert_string(self.transducer(chn).rstrip())
         else:
-            return self._convert_string('')
+            return self._convert_string("")
 
     def getPhysicalDimension(self, chn):
         """
@@ -623,7 +637,7 @@ class EdfReader(CyEdfReader):
         if 0 <= chn < self.signals_in_file:
             return self._convert_string(self.physical_dimension(chn).rstrip())
         else:
-            return self._convert_string('')
+            return self._convert_string("")
 
     def readSignal(self, chn, start=0, n=None, digital=False):
         """
@@ -682,6 +696,11 @@ class EdfReader(CyEdfReader):
         """
         self.file_info()
         for ii in np.arange(self.signals_in_file):
-            print("label:", self.getSignalLabels()[ii], "fs:",
-                  self.getSampleFrequencies()[ii], "nsamples",
-                  self.getNSamples()[ii])
+            print(
+                "label:",
+                self.getSignalLabels()[ii],
+                "fs:",
+                self.getSampleFrequencies()[ii],
+                "nsamples",
+                self.getNSamples()[ii],
+            )

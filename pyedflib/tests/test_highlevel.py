@@ -2,7 +2,7 @@
 # Copyright (c) 2019 - 2020 Simon Kern
 # Copyright (c) 2015 Holger Nahrstaedt
 
-import os, sys
+import os, sys, shutil
 import numpy as np
 # from numpy.testing import (assert_raises, run_module_suite,
 #                            assert_equal, assert_allclose, assert_almost_equal)
@@ -20,6 +20,7 @@ class TestHighLevel(unittest.TestCase):
         cls.edfplus_data_file = os.path.join(data_dir, 'tmp_test_file_plus.edf')
         cls.test_generator = os.path.join(data_dir, 'test_generator.edf')
         cls.test_accented = os.path.join(data_dir, "tmp_áä'üöß.edf")
+        cls.test_unicode = os.path.join(data_dir, "tmp_utf8-中文źąşㆆ운ʷᨄⅡəПр🤖.edf")
         cls.anonymized = os.path.join(data_dir, "tmp_anonymized.edf")
         cls.personalized = os.path.join(data_dir, "tmp_personalized.edf")
         cls.drop_from = os.path.join(data_dir, 'tmp_drop_from.edf')
@@ -56,7 +57,7 @@ class TestHighLevel(unittest.TestCase):
         
         header = highlevel.make_header(technician='tech', recording_additional='r_add',
                                                 patientname='name', patient_additional='p_add',
-                                                patientcode='42', equipment='eeg', admincode='420',
+                                                patientcode='42', equipment='eeg', admincode='120',
                                                 gender='Male', startdate=startdate,birthdate='05.09.1980')
         annotations = [[0.01, -1, 'begin'],[0.5, -1, 'middle'],[10, -1, 'end']]
 
@@ -116,7 +117,7 @@ class TestHighLevel(unittest.TestCase):
     def test_quick_write(self):
         signals = np.random.randint(-2048, 2048, [3, 256*60])
         highlevel.write_edf_quick(self.edfplus_data_file, signals.astype(np.int32), sfreq=256, digital=True)
-        signals2, _, _ = highlevel.read_edf(self.edfplus_data_file, digital=True)
+        signals2, _, _ = highlevel.read_edf(self.edfplus_data_file, digital=True, verbose=True)
         np.testing.assert_allclose(signals, signals2)
         signals = np.random.rand(3, 256*60)
         highlevel.write_edf_quick(self.edfplus_data_file, signals, sfreq=256)
@@ -162,8 +163,18 @@ class TestHighLevel(unittest.TestCase):
         signals2, _, _ = highlevel.read_edf(self.test_accented)
         
         np.testing.assert_allclose(signals, signals2, atol=0.00002)
-            
-        
+        # if os.name!='nt':
+        self.assertTrue(os.path.isfile(self.test_accented), 'File does not exist')
+
+    def test_read_unicode(self):
+        signals = np.random.rand(3, 256*60)
+        success = highlevel.write_edf_quick(self.edfplus_data_file, signals, sfreq=256)
+        self.assertTrue(success)
+        shutil.copy(self.edfplus_data_file, self.test_unicode)
+        signals2, _, _ = highlevel.read_edf(self.test_unicode)
+        self.assertTrue(os.path.isfile(self.test_unicode), 'File does not exist')
+
+
     def test_read_header(self):
         
         header = highlevel.read_edf_header(self.test_generator)
@@ -200,7 +211,7 @@ class TestHighLevel(unittest.TestCase):
                                                    'admincode', 'patientcode',
                                                    'technician'],
                                         new_values=['x', '', 'xx', 'xxx',
-                                                    'xxxx'], verify=True)
+                                                    'xxxx'], verify=True, verbose=True)
         new_header = highlevel.read_edf_header(self.anonymized)
         self.assertEqual(new_header['birthdate'], '')
         self.assertEqual(new_header['patientname'], 'x')
@@ -235,7 +246,7 @@ class TestHighLevel(unittest.TestCase):
         signals = np.random.rand(5, 256*300)*200 #5 minutes of eeg
         highlevel.write_edf(self.drop_from, signals, signal_headers)
         
-        dropped = highlevel.drop_channels(self.drop_from, to_keep=['ch1', 'ch2'])
+        dropped = highlevel.drop_channels(self.drop_from, to_keep=['ch1', 'ch2'], verbose=True)
         
         signals2, signal_headers, header = highlevel.read_edf(dropped)
         
@@ -249,6 +260,37 @@ class TestHighLevel(unittest.TestCase):
         
         with self.assertRaises(AssertionError):
             highlevel.drop_channels(self.drop_from, to_keep=['ch1'], to_drop=['ch3'])
+
+
+    def test_blocksize_auto(self):
+        """ test that the blocksize parameter works as intended"""
+        file = '{}.edf'.format(self.tmp_testfile)
+        siglen = 256* 155
+        signals = np.random.rand(10, siglen)
+        sheads = highlevel.make_signal_headers([str(x) for x in range(10)],
+                                              sample_rate=256, physical_max=1,
+                                              physical_min=-1)
+
+        valid_block_sizes = [-1, 1, 5, 31]
+        for block_size in valid_block_sizes:
+            highlevel.write_edf(file, signals, sheads, block_size=block_size)
+            signals2, _, _ = highlevel.read_edf(file)
+            np.testing.assert_allclose(signals, signals2, atol=0.01)
+
+        with self.assertRaises(AssertionError):
+            highlevel.write_edf(file, signals, sheads, block_size=61)
+
+        with self.assertRaises(AssertionError):
+            highlevel.write_edf(file, signals, sheads, block_size=-2)
+
+        # now test non-divisor block_size
+        siglen = signals.shape[-1]
+        highlevel.write_edf(file, signals, sheads, block_size=60)
+        signals2, _, _ = highlevel.read_edf(file)
+        self.assertEqual(signals2.shape, (10, 256*60*3))
+        np.testing.assert_allclose(signals2[:,:siglen], signals, atol=0.01)
+        np.testing.assert_allclose(signals2[:,siglen:], np.zeros([10, 25*256]),
+                                   atol=0.0001)
 
 
     # def test_rename_channels(self):
